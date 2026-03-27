@@ -10,7 +10,15 @@ async function fetchJSON<T>(url: string): Promise<T> {
   return res.json() as Promise<T>
 }
 
+export interface AppConfig {
+  mapbox_token: string
+}
+
 export const api = {
+  getConfig() {
+    return fetchJSON<AppConfig>('/config')
+  },
+
   getEvents(params?: { severity?: string; object_type?: string }) {
     const search = new URLSearchParams()
     if (params?.severity) search.set('severity', params.severity)

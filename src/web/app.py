@@ -52,6 +52,16 @@ async def startup_worker():
     asyncio.create_task(run_worker(get_output_dir()))
 
 
+# --- Config endpoint (serves env vars to frontend) ---
+
+@app.get("/api/config")
+def api_config():
+    """Expose public config to the frontend."""
+    return {
+        "mapbox_token": os.environ.get("VITE_MAPBOX_TOKEN", ""),
+    }
+
+
 # --- Upload & Jobs endpoints ---
 
 @app.post("/api/upload")

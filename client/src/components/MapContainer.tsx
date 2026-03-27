@@ -5,8 +5,6 @@ import 'mapbox-gl/dist/mapbox-gl.css'
 import { api } from '@/api/client'
 import { severityMapColor } from '@/lib/utils'
 
-mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN ?? ''
-
 interface MapContainerProps {
   selectedTripId: string | null
   onSelectTrip: (tripId: string | null) => void
@@ -15,6 +13,12 @@ interface MapContainerProps {
 export function MapContainer({ selectedTripId, onSelectTrip }: MapContainerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<mapboxgl.Map | null>(null)
+
+  const { data: config } = useQuery({
+    queryKey: ['config'],
+    queryFn: () => api.getConfig(),
+    staleTime: Infinity,
+  })
 
   const { data: tripsGeoJSON } = useQuery({
     queryKey: ['trips-geojson'],
@@ -30,8 +34,10 @@ export function MapContainer({ selectedTripId, onSelectTrip }: MapContainerProps
 
   // Initialize map
   useEffect(() => {
-    if (!containerRef.current) return
+    if (!containerRef.current || !config?.mapbox_token) return
     if (mapRef.current) return
+
+    mapboxgl.accessToken = config.mapbox_token
 
     const map = new mapboxgl.Map({
       container: containerRef.current,
@@ -135,7 +141,7 @@ export function MapContainer({ selectedTripId, onSelectTrip }: MapContainerProps
       mapRef.current = null
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [config?.mapbox_token])
 
   // Update trip lines when data changes
   useEffect(() => {
