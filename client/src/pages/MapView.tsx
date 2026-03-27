@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import L from 'leaflet'
-import 'leaflet/dist/leaflet.css'
+import mapboxgl from 'mapbox-gl'
+import 'mapbox-gl/dist/mapbox-gl.css'
 import { AlertTriangle } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { SeverityBadge } from '@/components/SeverityBadge'
@@ -10,9 +10,11 @@ import { api } from '@/api/client'
 import { severityMapColor } from '@/lib/utils'
 import type { GeoJSONFeature } from '@/types/events'
 
+mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN ?? ''
+
 export function MapView() {
   const mapContainer = useRef<HTMLDivElement>(null)
-  const mapRef = useRef<L.Map | null>(null)
+  const mapRef = useRef<mapboxgl.Map | null>(null)
   const navigate = useNavigate()
   const [selectedEvent, setSelectedEvent] = useState<GeoJSONFeature | null>(null)
 
@@ -28,16 +30,14 @@ export function MapView() {
       mapRef.current = null
     }
 
-    const map = L.map(mapContainer.current, {
-      center: [59.91, 10.75],
+    const map = new mapboxgl.Map({
+      container: mapContainer.current,
+      style: 'mapbox://styles/mapbox/streets-v12',
+      center: [10.75, 59.91],
       zoom: 10,
-      zoomControl: true,
     })
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap',
-      maxZoom: 19,
-    }).addTo(map)
+    map.addControl(new mapboxgl.NavigationControl(), 'top-right')
 
     mapRef.current = map
 
@@ -51,55 +51,104 @@ export function MapView() {
     const map = mapRef.current
     if (!map || !geojson || geojson.features.length === 0) return
 
-    const bounds = L.latLngBounds([])
+    const addLayers = () => {
+      // Clean up previous layers
+      for (const feature of geojson.features) {
+        const id = feature.properties.event_id
+        if (map.getLayer(`${id}-line`)) map.removeLayer(`${id}-line`)
+        if (map.getLayer(`${id}-point`)) map.removeLayer(`${id}-point`)
+        if (map.getSource(id)) map.removeSource(id)
+      }
 
-    for (const feature of geojson.features) {
-      const color = severityMapColor(feature.properties.severity_level)
+      const bounds = new mapboxgl.LngLatBounds()
 
-      if (feature.geometry.type === 'Point') {
-        const [lng, lat] = feature.geometry.coordinates as number[]
-        const marker = L.circleMarker([lat, lng], {
-          radius: 10,
-          color,
-          fillColor: color,
-          fillOpacity: 0.7,
-          weight: 2,
-        }).addTo(map)
+      for (const feature of geojson.features) {
+        const color = severityMapColor(feature.properties.severity_level)
+        const id = feature.properties.event_id
 
-        marker.on('click', () => setSelectedEvent(feature))
-        bounds.extend([lat, lng])
+        if (feature.geometry.type === 'Point') {
+          const [lng, lat] = feature.geometry.coordinates as number[]
 
-      } else if (feature.geometry.type === 'LineString') {
-        const coords = feature.geometry.coordinates as number[][]
-        const latlngs: L.LatLngExpression[] = coords.map(([lng, lat]) => [lat, lng])
+          map.addSource(id, {
+            type: 'geojson',
+            data: { type: 'Feature', geometry: feature.geometry, properties: {} },
+          })
+          map.addLayer({
+            id: `${id}-point`,
+            type: 'circle',
+            source: id,
+            paint: {
+              'circle-radius': 10,
+              'circle-color': color,
+              'circle-opacity': 0.7,
+              'circle-stroke-width': 2,
+              'circle-stroke-color': color,
+            },
+          })
 
-        const line = L.polyline(latlngs, {
-          color,
-          weight: 5,
-          opacity: 0.8,
-        }).addTo(map)
+          map.on('click', `${id}-point`, () => setSelectedEvent(feature))
+          map.on('mouseenter', `${id}-point`, () => { map.getCanvas().style.cursor = 'pointer' })
+          map.on('mouseleave', `${id}-point`, () => { map.getCanvas().style.cursor = '' })
 
-        // Add clickable marker at midpoint
-        const mid = latlngs[Math.floor(latlngs.length / 2)]
-        const marker = L.circleMarker(mid, {
-          radius: 8,
-          color,
-          fillColor: color,
-          fillOpacity: 0.8,
-          weight: 2,
-        }).addTo(map)
+          bounds.extend([lng, lat])
 
-        marker.on('click', () => setSelectedEvent(feature))
-        line.on('click', () => setSelectedEvent(feature))
+        } else if (feature.geometry.type === 'LineString') {
+          const coords = feature.geometry.coordinates as number[][]
 
-        for (const ll of latlngs) {
-          bounds.extend(ll)
+          map.addSource(id, {
+            type: 'geojson',
+            data: { type: 'Feature', geometry: feature.geometry, properties: {} },
+          })
+          map.addLayer({
+            id: `${id}-line`,
+            type: 'line',
+            source: id,
+            paint: {
+              'line-color': color,
+              'line-width': 5,
+              'line-opacity': 0.8,
+            },
+          })
+
+          // Clickable circle at midpoint
+          const mid = coords[Math.floor(coords.length / 2)]
+          map.addSource(`${id}-mid`, {
+            type: 'geojson',
+            data: { type: 'Feature', geometry: { type: 'Point', coordinates: mid }, properties: {} },
+          })
+          map.addLayer({
+            id: `${id}-point`,
+            type: 'circle',
+            source: `${id}-mid`,
+            paint: {
+              'circle-radius': 8,
+              'circle-color': color,
+              'circle-opacity': 0.8,
+              'circle-stroke-width': 2,
+              'circle-stroke-color': color,
+            },
+          })
+
+          map.on('click', `${id}-point`, () => setSelectedEvent(feature))
+          map.on('click', `${id}-line`, () => setSelectedEvent(feature))
+          map.on('mouseenter', `${id}-point`, () => { map.getCanvas().style.cursor = 'pointer' })
+          map.on('mouseleave', `${id}-point`, () => { map.getCanvas().style.cursor = '' })
+          map.on('mouseenter', `${id}-line`, () => { map.getCanvas().style.cursor = 'pointer' })
+          map.on('mouseleave', `${id}-line`, () => { map.getCanvas().style.cursor = '' })
+
+          for (const c of coords) bounds.extend(c as [number, number])
         }
+      }
+
+      if (!bounds.isEmpty()) {
+        map.fitBounds(bounds, { padding: 40 })
       }
     }
 
-    if (bounds.isValid()) {
-      map.fitBounds(bounds, { padding: [40, 40] })
+    if (map.isStyleLoaded()) {
+      addLayers()
+    } else {
+      map.on('load', addLayers)
     }
   }, [geojson])
 

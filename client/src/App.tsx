@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Layout } from '@/components/Layout'
 import { Dashboard } from '@/pages/Dashboard'
 
-// Lazy-load heavy pages (MapView has mapbox-gl ~500KB)
+// Lazy-load heavy pages
 const EventList = lazy(() => import('@/pages/EventList').then(m => ({ default: m.EventList })))
 const EventDetail = lazy(() => import('@/pages/EventDetail').then(m => ({ default: m.EventDetail })))
 const MapView = lazy(() => import('@/pages/MapView').then(m => ({ default: m.MapView })))

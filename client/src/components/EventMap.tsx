@@ -1,20 +1,19 @@
 import { useEffect, useRef } from 'react'
-import L from 'leaflet'
-import 'leaflet/dist/leaflet.css'
+import mapboxgl from 'mapbox-gl'
+import 'mapbox-gl/dist/mapbox-gl.css'
 import { severityMapColor } from '@/lib/utils'
 
+mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN ?? ''
+
 interface EventMapProps {
-  /** Array of {latitude, longitude} points for this event */
   points: Array<{ latitude: number; longitude: number }>
-  /** Severity level for coloring */
   severityLevel?: string
-  /** Height of the map container */
   height?: string
 }
 
 export function EventMap({ points, severityLevel = 'medium', height = '300px' }: EventMapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const mapRef = useRef<L.Map | null>(null)
+  const mapRef = useRef<mapboxgl.Map | null>(null)
 
   useEffect(() => {
     if (!containerRef.current || points.length === 0) return
@@ -24,61 +23,78 @@ export function EventMap({ points, severityLevel = 'medium', height = '300px' }:
     }
 
     const color = severityMapColor(severityLevel)
-    const center: L.LatLngExpression = [points[0].latitude, points[0].longitude]
 
-    const map = L.map(containerRef.current, {
-      center,
+    const map = new mapboxgl.Map({
+      container: containerRef.current,
+      style: 'mapbox://styles/mapbox/streets-v12',
+      center: [points[0].longitude, points[0].latitude],
       zoom: 15,
-      zoomControl: true,
-      attributionControl: true,
     })
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap',
-      maxZoom: 19,
-    }).addTo(map)
+    map.addControl(new mapboxgl.NavigationControl(), 'top-right')
 
-    if (points.length === 1) {
-      // Single point — show marker
-      L.circleMarker([points[0].latitude, points[0].longitude], {
-        radius: 10,
-        color,
-        fillColor: color,
-        fillOpacity: 0.7,
-        weight: 2,
-      }).addTo(map)
-    } else {
-      // Multiple points — show route line + markers at start/end
-      const latlngs: L.LatLngExpression[] = points.map(p => [p.latitude, p.longitude])
+    map.on('load', () => {
+      if (points.length === 1) {
+        map.addSource('point', {
+          type: 'geojson',
+          data: {
+            type: 'Feature',
+            geometry: { type: 'Point', coordinates: [points[0].longitude, points[0].latitude] },
+            properties: {},
+          },
+        })
+        map.addLayer({
+          id: 'point',
+          type: 'circle',
+          source: 'point',
+          paint: {
+            'circle-radius': 10,
+            'circle-color': color,
+            'circle-opacity': 0.7,
+            'circle-stroke-width': 2,
+            'circle-stroke-color': color,
+          },
+        })
+      } else {
+        const coordinates = points.map(p => [p.longitude, p.latitude] as [number, number])
 
-      L.polyline(latlngs, {
-        color,
-        weight: 4,
-        opacity: 0.8,
-      }).addTo(map)
+        map.addSource('route', {
+          type: 'geojson',
+          data: {
+            type: 'Feature',
+            geometry: { type: 'LineString', coordinates },
+            properties: {},
+          },
+        })
+        map.addLayer({
+          id: 'route',
+          type: 'line',
+          source: 'route',
+          paint: {
+            'line-color': color,
+            'line-width': 4,
+            'line-opacity': 0.8,
+          },
+        })
 
-      // Start marker (green)
-      L.circleMarker(latlngs[0], {
-        radius: 8,
-        color: '#22c55e',
-        fillColor: '#22c55e',
-        fillOpacity: 0.8,
-        weight: 2,
-      }).bindTooltip('Start').addTo(map)
+        // Start marker
+        new mapboxgl.Marker({ color: '#22c55e' })
+          .setLngLat(coordinates[0])
+          .setPopup(new mapboxgl.Popup().setText('Start'))
+          .addTo(map)
 
-      // End marker (red)
-      L.circleMarker(latlngs[latlngs.length - 1], {
-        radius: 8,
-        color: '#ef4444',
-        fillColor: '#ef4444',
-        fillOpacity: 0.8,
-        weight: 2,
-      }).bindTooltip('Slutt').addTo(map)
+        // End marker
+        new mapboxgl.Marker({ color: '#ef4444' })
+          .setLngLat(coordinates[coordinates.length - 1])
+          .setPopup(new mapboxgl.Popup().setText('Slutt'))
+          .addTo(map)
 
-      // Fit bounds
-      const bounds = L.latLngBounds(latlngs)
-      map.fitBounds(bounds, { padding: [30, 30] })
-    }
+        // Fit bounds
+        const bounds = new mapboxgl.LngLatBounds()
+        coordinates.forEach(c => bounds.extend(c))
+        map.fitBounds(bounds, { padding: 40 })
+      }
+    })
 
     mapRef.current = map
 
