@@ -105,6 +105,49 @@ export interface GeoJSONCollection {
   features: GeoJSONFeature[]
 }
 
+export interface Trip {
+  trip_id: string
+  filename: string
+  created_at: string
+  completed_at: string | null
+  gps_track: number[][]  // [lng, lat][]
+  event_ids: string[]
+  total_events: number
+  worst_severity: 'low' | 'medium' | 'high' | 'critical'
+}
+
+export interface TripsResponse {
+  total_trips: number
+  trips: Trip[]
+}
+
+export interface TripDetail {
+  trip: Trip
+  events: EventDetail[]
+}
+
+export interface TripsGeoJSONFeature {
+  type: 'Feature'
+  geometry: {
+    type: 'LineString'
+    coordinates: number[][]
+  }
+  properties: {
+    trip_id: string
+    filename: string
+    created_at: string
+    completed_at: string | null
+    total_events: number
+    worst_severity: string
+    event_ids: string[]
+  }
+}
+
+export interface TripsGeoJSONCollection {
+  type: 'FeatureCollection'
+  features: TripsGeoJSONFeature[]
+}
+
 export interface Job {
   id: string
   status: 'queued' | 'processing' | 'complete' | 'error'

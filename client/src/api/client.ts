@@ -1,4 +1,4 @@
-import type { EventsResponse, EventDetail, GeoJSONCollection, JobsResponse, Job, UploadResponse } from '@/types/events'
+import type { EventsResponse, EventDetail, GeoJSONCollection, JobsResponse, Job, UploadResponse, TripsResponse, TripDetail, TripsGeoJSONCollection } from '@/types/events'
 
 const BASE_URL = '/api'
 
@@ -50,6 +50,18 @@ export const api = {
       throw new Error(err.error || `Upload feilet: ${res.status}`)
     }
     return res.json() as Promise<UploadResponse>
+  },
+
+  getTrips() {
+    return fetchJSON<TripsResponse>('/trips')
+  },
+
+  getTrip(tripId: string) {
+    return fetchJSON<TripDetail>(`/trips/${tripId}`)
+  },
+
+  getTripsGeoJSON() {
+    return fetchJSON<TripsGeoJSONCollection>('/trips/geojson')
   },
 
   getJobs() {

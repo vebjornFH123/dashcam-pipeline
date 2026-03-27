@@ -81,25 +81,77 @@ def list_jobs() -> list[Job]:
     return sorted(_jobs.values(), key=lambda j: j.created_at, reverse=True)
 
 
+def _save_trip_metadata(output_dir: str, job: "Job", trackpoints: list | None, events: list):
+    """Save trip metadata to disk after job completion."""
+    trip_dir = os.path.join(output_dir, "trips", job.id)
+    os.makedirs(trip_dir, exist_ok=True)
+
+    # Build GPS track from trackpoints (as [lng, lat] pairs)
+    gps_track = []
+    if trackpoints:
+        for tp in trackpoints:
+            lat = tp.get("latitude")
+            lon = tp.get("longitude")
+            if lat is not None and lon is not None:
+                gps_track.append([lon, lat])
+
+    # Collect event IDs and worst severity
+    event_ids = [ev.get("event_id", "") for ev in events]
+    severity_order = {"critical": 4, "high": 3, "medium": 2, "low": 1}
+    worst_severity = "low"
+    for ev in events:
+        level = ev.get("severity", {}).get("severity_level", "low")
+        if severity_order.get(level, 0) > severity_order.get(worst_severity, 0):
+            worst_severity = level
+
+    trip = {
+        "trip_id": job.id,
+        "filename": job.filename,
+        "created_at": job.created_at,
+        "completed_at": job.completed_at,
+        "gps_track": gps_track,
+        "event_ids": event_ids,
+        "total_events": len(events),
+        "worst_severity": worst_severity,
+    }
+
+    with open(os.path.join(trip_dir, "trip_metadata.json"), "w") as f:
+        json.dump(trip, f, indent=2)
+    logger.info(f"Trip metadata saved for {job.id} ({len(gps_track)} GPS points, {len(events)} events)")
+
+
 def _rebuild_exports(output_dir: str):
-    """Rebuild summary.json and events.geojson from all events on disk."""
-    from src.export.exporter import generate_summary, generate_geojson
+    """Rebuild summary.json, events.geojson, trips.json, and trips.geojson from disk."""
+    from src.export.exporter import generate_summary, generate_geojson, generate_trips_summary, generate_trips_geojson
 
     events_dir = os.path.join(output_dir, "events")
-    if not os.path.isdir(events_dir):
-        return
+    if os.path.isdir(events_dir):
+        all_events = []
+        for event_id in sorted(os.listdir(events_dir)):
+            meta_path = os.path.join(events_dir, event_id, "metadata.json")
+            if os.path.isfile(meta_path):
+                with open(meta_path) as f:
+                    all_events.append(json.load(f))
 
-    all_events = []
-    for event_id in sorted(os.listdir(events_dir)):
-        meta_path = os.path.join(events_dir, event_id, "metadata.json")
-        if os.path.isfile(meta_path):
-            with open(meta_path) as f:
-                all_events.append(json.load(f))
+        if all_events:
+            generate_summary(all_events, os.path.join(output_dir, "summary.json"))
+            generate_geojson(all_events, os.path.join(output_dir, "events.geojson"))
+            logger.info(f"Rebuilt event exports with {len(all_events)} total events")
 
-    if all_events:
-        generate_summary(all_events, os.path.join(output_dir, "summary.json"))
-        generate_geojson(all_events, os.path.join(output_dir, "events.geojson"))
-        logger.info(f"Rebuilt exports with {len(all_events)} total events")
+    # Rebuild trip exports
+    trips_dir = os.path.join(output_dir, "trips")
+    if os.path.isdir(trips_dir):
+        all_trips = []
+        for trip_id in sorted(os.listdir(trips_dir)):
+            trip_meta_path = os.path.join(trips_dir, trip_id, "trip_metadata.json")
+            if os.path.isfile(trip_meta_path):
+                with open(trip_meta_path) as f:
+                    all_trips.append(json.load(f))
+
+        if all_trips:
+            generate_trips_summary(all_trips, os.path.join(output_dir, "trips.json"))
+            generate_trips_geojson(all_trips, os.path.join(output_dir, "trips.geojson"))
+            logger.info(f"Rebuilt trip exports with {len(all_trips)} total trips")
 
 
 def _count_existing_events(output_dir: str) -> int:
@@ -169,6 +221,7 @@ async def run_worker(output_dir: str):
             job.progress_message = f"Ferdig — {len(events)} hendelser funnet ({elapsed:.1f}s)"
             logger.info(f"[Job {job.id}] Complete: {len(events)} events in {elapsed:.1f}s")
 
+            _save_trip_metadata(output_dir, job, trackpoints, events)
             _rebuild_exports(output_dir)
 
         except Exception as e:

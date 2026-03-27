@@ -1,17 +1,21 @@
-import { Link } from 'react-router-dom'
 import { Camera, Clock, MapPin } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { SeverityBadge } from '@/components/SeverityBadge'
 import { formatTimestamp } from '@/lib/utils'
 import type { EventSummary } from '@/types/events'
 
-export function EventCard({ event }: { event: EventSummary }) {
+interface EventCardProps {
+  event: EventSummary
+  onClick?: () => void
+}
+
+export function EventCard({ event, onClick }: EventCardProps) {
   const objectList = Object.entries(event.object_counts)
     .map(([k, v]) => `${v} ${k}`)
     .join(', ')
 
   return (
-    <Link to={`/events/${event.event_id}`}>
+    <div onClick={onClick} className={onClick ? 'cursor-pointer' : undefined}>
       <Card className="transition-shadow hover:shadow-md">
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardTitle className="text-sm font-medium">{event.event_id}</CardTitle>
@@ -37,6 +41,6 @@ export function EventCard({ event }: { event: EventSummary }) {
           </div>
         </CardContent>
       </Card>
-    </Link>
+    </div>
   )
 }

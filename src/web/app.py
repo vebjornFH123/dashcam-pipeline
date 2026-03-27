@@ -198,6 +198,58 @@ def get_annotated_frame(event_id: str, filename: str):
     return JSONResponse(status_code=404, content={"error": "Frame not found"})
 
 
+@app.get("/api/trips")
+def api_list_trips():
+    """List all trips."""
+    trips_path = os.path.join(get_output_dir(), "trips.json")
+    if not os.path.exists(trips_path):
+        return {"total_trips": 0, "trips": []}
+    with open(trips_path) as f:
+        return json.load(f)
+
+
+@app.get("/api/trips/geojson")
+def api_trips_geojson():
+    """Get GeoJSON with trip lines for map display."""
+    geojson_path = os.path.join(get_output_dir(), "trips.geojson")
+    if os.path.exists(geojson_path):
+        with open(geojson_path) as f:
+            return json.load(f)
+    return {"type": "FeatureCollection", "features": []}
+
+
+@app.get("/api/trips/{trip_id}")
+def api_get_trip(trip_id: str):
+    """Get a single trip with its events."""
+    trip_meta_path = os.path.join(get_output_dir(), "trips", trip_id, "trip_metadata.json")
+    if not os.path.exists(trip_meta_path):
+        return JSONResponse(status_code=404, content={"error": "Trip not found"})
+
+    with open(trip_meta_path) as f:
+        trip = json.load(f)
+
+    # Load full event data for this trip
+    events = []
+    for event_id in trip.get("event_ids", []):
+        event_meta_path = os.path.join(get_output_dir(), "events", event_id, "metadata.json")
+        if os.path.isfile(event_meta_path):
+            with open(event_meta_path) as f:
+                metadata = json.load(f)
+
+            event_dir = os.path.join(get_output_dir(), "events", event_id)
+            frames_dir = os.path.join(event_dir, "frames")
+            annotated_dir = os.path.join(event_dir, "annotated")
+
+            events.append({
+                "event_id": event_id,
+                "metadata": metadata,
+                "frames": sorted(os.listdir(frames_dir)) if os.path.isdir(frames_dir) else [],
+                "annotated_frames": sorted(os.listdir(annotated_dir)) if os.path.isdir(annotated_dir) else [],
+            })
+
+    return {"trip": trip, "events": events}
+
+
 @app.get("/api/geojson")
 def get_geojson():
     """Get GeoJSON data for map display."""

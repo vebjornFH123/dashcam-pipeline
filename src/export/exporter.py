@@ -102,6 +102,58 @@ def generate_geojson(events: List[Dict[str, Any]], output_path: str) -> Dict:
     return geojson
 
 
+def generate_trips_summary(trips: List[Dict[str, Any]], output_path: str) -> Dict:
+    """Generate trips.json with all trip metadata."""
+    summary = {
+        "total_trips": len(trips),
+        "trips": trips,
+    }
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    with open(output_path, "w") as f:
+        json.dump(summary, f, indent=2)
+    logger.info(f"Trips summary written to {output_path} ({len(trips)} trips)")
+    return summary
+
+
+def generate_trips_geojson(trips: List[Dict[str, Any]], output_path: str) -> Dict:
+    """Generate GeoJSON with one LineString per trip."""
+    features = []
+
+    for trip in trips:
+        gps_track = trip.get("gps_track", [])
+        if len(gps_track) < 2:
+            continue
+
+        feature = {
+            "type": "Feature",
+            "geometry": {
+                "type": "LineString",
+                "coordinates": gps_track,
+            },
+            "properties": {
+                "trip_id": trip["trip_id"],
+                "filename": trip.get("filename", ""),
+                "created_at": trip.get("created_at"),
+                "completed_at": trip.get("completed_at"),
+                "total_events": trip.get("total_events", 0),
+                "worst_severity": trip.get("worst_severity", "low"),
+                "event_ids": trip.get("event_ids", []),
+            },
+        }
+        features.append(feature)
+
+    geojson = {
+        "type": "FeatureCollection",
+        "features": features,
+    }
+
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    with open(output_path, "w") as f:
+        json.dump(geojson, f, indent=2)
+    logger.info(f"Trips GeoJSON written to {output_path} ({len(features)} features)")
+    return geojson
+
+
 def generate_nvdb_export(events: List[Dict[str, Any]], output_path: str) -> Dict:
     """Generate NVDB-friendly export JSON."""
     nvdb_objects = []
