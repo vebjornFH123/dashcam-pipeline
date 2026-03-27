@@ -14,9 +14,8 @@ client/dist/
 output/
 runs/
 
-# Models (large binary files)
-models/*.pt
-*.pt
+# Models - training data only
+models/road_damage_data/
 !models/.gitkeep
 
 # Environment

@@ -10,8 +10,7 @@ client/dist/
 output/
 runs/
 
-# Models (large binaries - mount or download at runtime)
-*.pt
+# Training data
 models/road_damage_data/
 
 # Dev files

@@ -25,9 +25,11 @@ WORKDIR /app
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy source code
+# Copy source code and models
 COPY src/ ./src/
 COPY setup.py ./
+COPY models/*.pt ./models/
+COPY *.pt ./
 
 # Copy built frontend from stage 1
 COPY --from=frontend /app/client/dist ./client/dist
@@ -36,6 +38,7 @@ COPY --from=frontend /app/client/dist ./client/dist
 RUN mkdir -p /app/output
 
 ENV DASHCAM_OUTPUT_DIR=/app/output
+ENV DASHCAM_ROAD_DAMAGE_MODEL=/app/models/road_damage.pt
 ENV PYTHONUNBUFFERED=1
 
 EXPOSE 8000
