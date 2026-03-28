@@ -25,10 +25,12 @@ export function MapApp() {
         isAnalyzing={!!activeJobId}
       />
 
-      <EventSidebar
-        selectedEventId={selectedEventId}
-        onSelectEvent={setSelectedEventId}
-      />
+      {!isRecording && (
+        <EventSidebar
+          selectedEventId={selectedEventId}
+          onSelectEvent={setSelectedEventId}
+        />
+      )}
 
       {isRecording && (
         <RecordingOverlay
