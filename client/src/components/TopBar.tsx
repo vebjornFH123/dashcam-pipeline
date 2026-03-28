@@ -8,7 +8,7 @@ interface TopBarProps {
 
 export function TopBar({ onRecord, isAnalyzing }: TopBarProps) {
   return (
-    <div className="absolute top-0 left-0 right-0 z-10 pointer-events-none">
+    <div className="absolute top-0 left-0 right-0 z-20 pointer-events-none">
       <div className="flex items-center justify-between px-4 py-3">
         <div className="pointer-events-auto rounded-lg bg-background/80 backdrop-blur-sm px-3 py-1.5 shadow-md border">
           <h1 className="text-sm font-bold tracking-tight">Dashcam Analytics</h1>
