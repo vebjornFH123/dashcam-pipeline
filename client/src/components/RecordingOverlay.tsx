@@ -146,7 +146,14 @@ export function RecordingOverlay({ onClose, onJobStarted }: RecordingOverlayProp
       </div>
 
       {/* Controls */}
-      <div className="flex items-center justify-center gap-8 py-6 bg-black/80">
+      <div className="flex items-center justify-center gap-8 py-8 pb-[env(safe-area-inset-bottom,2rem)] bg-black/80">
+        {!stream && !isRecording && (
+          <div className="flex items-center gap-3 text-white/60">
+            <Loader2 className="h-5 w-5 animate-spin" />
+            <span>Åpner kamera...</span>
+          </div>
+        )}
+
         {stream && !isRecording && (
           <Button
             variant="ghost"
@@ -161,18 +168,18 @@ export function RecordingOverlay({ onClose, onJobStarted }: RecordingOverlayProp
         {stream && !isRecording && (
           <button
             onClick={startRecording}
-            className="h-16 w-16 rounded-full border-4 border-white flex items-center justify-center hover:bg-white/10 transition-colors"
+            className="h-20 w-20 rounded-full border-4 border-white flex items-center justify-center hover:bg-white/10 transition-colors"
           >
-            <Circle className="h-10 w-10 text-red-500 fill-red-500" />
+            <Circle className="h-12 w-12 text-red-500 fill-red-500" />
           </button>
         )}
 
         {isRecording && (
           <button
             onClick={stopRecording}
-            className="h-16 w-16 rounded-full border-4 border-white flex items-center justify-center hover:bg-white/10 transition-colors"
+            className="h-20 w-20 rounded-full border-4 border-white flex items-center justify-center hover:bg-white/10 transition-colors"
           >
-            <Square className="h-8 w-8 text-red-500 fill-red-500" />
+            <Square className="h-10 w-10 text-red-500 fill-red-500" />
           </button>
         )}
 
