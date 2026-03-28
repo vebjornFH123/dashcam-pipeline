@@ -32,12 +32,15 @@ export function MapContainer({ selectedTripId, onSelectTrip }: MapContainerProps
     enabled: !!selectedTripId,
   })
 
+  // Resolve token: API config first, then Vite env fallback
+  const mapboxToken = config?.mapbox_token || import.meta.env.VITE_MAPBOX_TOKEN || ''
+
   // Initialize map
   useEffect(() => {
-    if (!containerRef.current || !config?.mapbox_token) return
+    if (!containerRef.current || !mapboxToken) return
     if (mapRef.current) return
 
-    mapboxgl.accessToken = config.mapbox_token
+    mapboxgl.accessToken = mapboxToken
 
     const map = new mapboxgl.Map({
       container: containerRef.current,
@@ -141,7 +144,7 @@ export function MapContainer({ selectedTripId, onSelectTrip }: MapContainerProps
       mapRef.current = null
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [config?.mapbox_token])
+  }, [mapboxToken])
 
   // Update trip lines when data changes
   useEffect(() => {

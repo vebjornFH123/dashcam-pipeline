@@ -58,7 +58,7 @@ async def startup_worker():
 def api_config():
     """Expose public config to the frontend."""
     return {
-        "mapbox_token": os.environ.get("VITE_MAPBOX_TOKEN", ""),
+        "mapbox_token": os.environ.get("MAPBOX_TOKEN") or os.environ.get("VITE_MAPBOX_TOKEN", ""),
     }
 
 
