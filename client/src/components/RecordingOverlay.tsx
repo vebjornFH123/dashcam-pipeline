@@ -111,13 +111,13 @@ export function RecordingOverlay({ onClose, onJobStarted }: RecordingOverlayProp
       )}
 
       {/* Camera preview */}
-      <div className="flex-1 relative">
+      <div className="flex-1 relative min-h-0 overflow-hidden">
         <video
           ref={videoRef}
           autoPlay
           playsInline
           muted
-          className="h-full w-full object-cover"
+          className="absolute inset-0 h-full w-full object-cover"
         />
 
         {/* Recording indicator */}
