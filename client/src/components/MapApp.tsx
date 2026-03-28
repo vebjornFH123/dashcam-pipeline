@@ -3,23 +3,31 @@ import { MapContainer } from '@/components/MapContainer'
 import { TopBar } from '@/components/TopBar'
 import { RecordingOverlay } from '@/components/RecordingOverlay'
 import { AnalysisToast } from '@/components/AnalysisToast'
-import { TripPanel } from '@/components/TripPanel'
+import { EventSidebar } from '@/components/EventSidebar'
 
 export function MapApp() {
   const [isRecording, setIsRecording] = useState(false)
   const [activeJobId, setActiveJobId] = useState<string | null>(null)
   const [selectedTripId, setSelectedTripId] = useState<string | null>(null)
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null)
 
   return (
     <div className="w-screen h-svh relative overflow-hidden">
       <MapContainer
         selectedTripId={selectedTripId}
         onSelectTrip={setSelectedTripId}
+        selectedEventId={selectedEventId}
+        onSelectEvent={setSelectedEventId}
       />
 
       <TopBar
         onRecord={() => setIsRecording(true)}
         isAnalyzing={!!activeJobId}
+      />
+
+      <EventSidebar
+        selectedEventId={selectedEventId}
+        onSelectEvent={setSelectedEventId}
       />
 
       {isRecording && (
@@ -33,13 +41,6 @@ export function MapApp() {
         <AnalysisToast
           jobId={activeJobId}
           onDone={() => setActiveJobId(null)}
-        />
-      )}
-
-      {selectedTripId && (
-        <TripPanel
-          tripId={selectedTripId}
-          onClose={() => setSelectedTripId(null)}
         />
       )}
     </div>

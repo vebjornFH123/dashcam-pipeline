@@ -8,9 +8,11 @@ import { severityMapColor } from '@/lib/utils'
 interface MapContainerProps {
   selectedTripId: string | null
   onSelectTrip: (tripId: string | null) => void
+  selectedEventId: string | null
+  onSelectEvent: (eventId: string | null) => void
 }
 
-export function MapContainer({ selectedTripId, onSelectTrip }: MapContainerProps) {
+export function MapContainer({ selectedTripId, onSelectTrip, selectedEventId, onSelectEvent }: MapContainerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<mapboxgl.Map | null>(null)
 
@@ -28,12 +30,11 @@ export function MapContainer({ selectedTripId, onSelectTrip }: MapContainerProps
   })
 
   const { data: eventsGeoJSON } = useQuery({
-    queryKey: ['events-geojson', selectedTripId],
+    queryKey: ['events-geojson'],
     queryFn: () => api.getGeoJSON(),
-    enabled: !!selectedTripId,
+    refetchInterval: 10_000,
   })
 
-  // Resolve token: API config first, then Vite env fallback
   const mapboxToken = config?.mapbox_token || import.meta.env.VITE_MAPBOX_TOKEN || ''
 
   // Initialize map
@@ -53,13 +54,11 @@ export function MapContainer({ selectedTripId, onSelectTrip }: MapContainerProps
     map.addControl(new mapboxgl.NavigationControl(), 'top-right')
 
     map.on('load', () => {
-      // Trip lines source (empty initially)
+      // Trip lines
       map.addSource('trips', {
         type: 'geojson',
         data: { type: 'FeatureCollection', features: [] },
       })
-
-      // Trip lines layer
       map.addLayer({
         id: 'trip-lines',
         type: 'line',
@@ -73,29 +72,17 @@ export function MapContainer({ selectedTripId, onSelectTrip }: MapContainerProps
             'low', severityMapColor('low'),
             severityMapColor('low'),
           ],
-          'line-width': [
-            'case',
-            ['boolean', ['feature-state', 'selected'], false], 6,
-            4,
-          ],
-          'line-opacity': [
-            'case',
-            ['boolean', ['feature-state', 'selected'], false], 1,
-            0.7,
-          ],
+          'line-width': 4,
+          'line-opacity': 0.7,
         },
-        layout: {
-          'line-cap': 'round',
-          'line-join': 'round',
-        },
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
       })
 
-      // Event markers source (empty initially)
+      // Event markers (always visible)
       map.addSource('events', {
         type: 'geojson',
         data: { type: 'FeatureCollection', features: [] },
       })
-
       map.addLayer({
         id: 'event-points',
         type: 'circle',
@@ -116,18 +103,16 @@ export function MapContainer({ selectedTripId, onSelectTrip }: MapContainerProps
         },
       })
 
+      // Click event marker
+      map.on('click', 'event-points', (e) => {
+        const eventId = e.features?.[0]?.properties?.event_id
+        if (eventId) onSelectEvent(eventId)
+      })
+
       // Click trip line
       map.on('click', 'trip-lines', (e) => {
         if (e.features?.[0]?.properties?.trip_id) {
           onSelectTrip(e.features[0].properties.trip_id)
-        }
-      })
-
-      // Click elsewhere to deselect
-      map.on('click', (e) => {
-        const features = map.queryRenderedFeatures(e.point, { layers: ['trip-lines', 'event-points'] })
-        if (features.length === 0) {
-          onSelectTrip(null)
         }
       })
 
@@ -147,7 +132,7 @@ export function MapContainer({ selectedTripId, onSelectTrip }: MapContainerProps
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapboxToken])
 
-  // Update trip lines when data changes
+  // Update trip lines
   useEffect(() => {
     const map = mapRef.current
     if (!map || !tripsGeoJSON) return
@@ -157,7 +142,6 @@ export function MapContainer({ selectedTripId, onSelectTrip }: MapContainerProps
       source.setData(tripsGeoJSON as unknown as GeoJSON.FeatureCollection)
     }
 
-    // Fit bounds to all trips
     if (tripsGeoJSON.features.length > 0 && !selectedTripId) {
       const bounds = new mapboxgl.LngLatBounds()
       for (const feature of tripsGeoJSON.features) {
@@ -166,58 +150,56 @@ export function MapContainer({ selectedTripId, onSelectTrip }: MapContainerProps
         }
       }
       if (!bounds.isEmpty()) {
-        map.fitBounds(bounds, { padding: 60, maxZoom: 14 })
+        map.fitBounds(bounds, { padding: { top: 60, bottom: 60, left: 60, right: 420 }, maxZoom: 14 })
       }
     }
   }, [tripsGeoJSON, selectedTripId])
 
-  // Update event markers when a trip is selected
+  // Update event markers (always show all events)
   useEffect(() => {
     const map = mapRef.current
-    if (!map) return
+    if (!map || !eventsGeoJSON) return
 
     const source = map.getSource('events') as mapboxgl.GeoJSONSource | undefined
-    if (!source) return
-
-    if (!selectedTripId || !eventsGeoJSON) {
-      source.setData({ type: 'FeatureCollection', features: [] })
-      return
+    if (source) {
+      source.setData(eventsGeoJSON as unknown as GeoJSON.FeatureCollection)
     }
 
-    // Find selected trip to get its event IDs
-    const selectedTrip = tripsGeoJSON?.features.find(
-      f => f.properties.trip_id === selectedTripId
-    )
-    const eventIds = new Set(selectedTrip?.properties.event_ids ?? [])
+    // Fit bounds to events if no trips
+    if (eventsGeoJSON.features.length > 0 && (!tripsGeoJSON || tripsGeoJSON.features.length === 0)) {
+      const bounds = new mapboxgl.LngLatBounds()
+      for (const feature of eventsGeoJSON.features) {
+        const coords = feature.geometry.type === 'Point'
+          ? [feature.geometry.coordinates as number[]]
+          : feature.geometry.coordinates as number[][]
+        for (const c of coords) {
+          bounds.extend(c as [number, number])
+        }
+      }
+      if (!bounds.isEmpty()) {
+        map.fitBounds(bounds, { padding: { top: 60, bottom: 60, left: 60, right: 420 }, maxZoom: 14 })
+      }
+    }
+  }, [eventsGeoJSON, tripsGeoJSON])
 
-    // Filter events to only those belonging to this trip
-    const filteredFeatures = eventsGeoJSON.features.filter(
-      f => eventIds.has(f.properties.event_id)
-    )
-
-    source.setData({ type: 'FeatureCollection', features: filteredFeatures } as unknown as GeoJSON.FeatureCollection)
-  }, [selectedTripId, eventsGeoJSON, tripsGeoJSON])
-
-  // Zoom to selected trip
+  // Fly to selected event
   useEffect(() => {
     const map = mapRef.current
-    if (!map || !selectedTripId || !tripsGeoJSON) return
+    if (!map || !selectedEventId || !eventsGeoJSON) return
 
-    const feature = tripsGeoJSON.features.find(
-      f => f.properties.trip_id === selectedTripId
+    const feature = eventsGeoJSON.features.find(
+      f => f.properties.event_id === selectedEventId
     )
     if (!feature) return
 
-    const bounds = new mapboxgl.LngLatBounds()
-    for (const coord of feature.geometry.coordinates) {
-      bounds.extend(coord as [number, number])
-    }
-    if (!bounds.isEmpty()) {
-      map.fitBounds(bounds, { padding: { top: 60, bottom: 60, left: 60, right: 420 }, maxZoom: 16 })
-    }
-  }, [selectedTripId, tripsGeoJSON])
+    const coords = feature.geometry.type === 'Point'
+      ? feature.geometry.coordinates as [number, number]
+      : (feature.geometry.coordinates as number[][])[0] as [number, number]
+
+    map.flyTo({ center: coords, zoom: 15, offset: [-200, 0] })
+  }, [selectedEventId, eventsGeoJSON])
 
   return (
-    <div ref={containerRef} className="absolute inset-0" />
+    <div ref={containerRef} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100%' }} />
   )
 }
