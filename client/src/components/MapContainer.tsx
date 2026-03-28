@@ -18,6 +18,7 @@ export function MapContainer({ selectedTripId, onSelectTrip }: MapContainerProps
     queryKey: ['config'],
     queryFn: () => api.getConfig(),
     staleTime: Infinity,
+    enabled: !import.meta.env.VITE_MAPBOX_TOKEN,
   })
 
   const { data: tripsGeoJSON } = useQuery({
