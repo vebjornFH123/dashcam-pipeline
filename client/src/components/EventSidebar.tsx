@@ -38,7 +38,7 @@ export function EventSidebar({ selectedEventId, onSelectEvent }: EventSidebarPro
       </div>
 
       {/* Mobile: bottom sheet */}
-      <div className="sm:hidden absolute bottom-0 left-0 right-0 z-10 max-h-[40vh] flex flex-col bg-background/95 backdrop-blur-sm border-t rounded-t-xl shadow-xl">
+      <div className="sm:hidden absolute bottom-0 left-0 right-0 z-10 max-h-[40svh] flex flex-col bg-background/95 backdrop-blur-sm border-t rounded-t-xl shadow-xl">
         <SidebarContent
           events={events}
           isLoading={isLoading}

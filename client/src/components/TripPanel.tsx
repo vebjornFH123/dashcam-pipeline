@@ -42,7 +42,7 @@ export function TripPanel({ tripId, onClose }: TripPanelProps) {
       </div>
 
       {/* Mobile: bottom sheet */}
-      <div className="sm:hidden absolute bottom-0 left-0 right-0 z-20 max-h-[75vh] flex flex-col bg-background/95 backdrop-blur-sm border-t rounded-t-xl shadow-xl">
+      <div className="sm:hidden absolute bottom-0 left-0 right-0 z-20 max-h-[75svh] flex flex-col bg-background/95 backdrop-blur-sm border-t rounded-t-xl shadow-xl">
         <PanelContent
           trip={trip}
           events={events}
