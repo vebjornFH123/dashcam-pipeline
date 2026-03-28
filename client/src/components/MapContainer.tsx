@@ -78,6 +78,27 @@ export function MapContainer({ selectedTripId, onSelectTrip, selectedEventId, on
         layout: { 'line-cap': 'round', 'line-join': 'round' },
       })
 
+      // Selected trip highlight layer
+      map.addLayer({
+        id: 'trip-lines-selected',
+        type: 'line',
+        source: 'trips',
+        filter: ['==', ['get', 'trip_id'], ''],
+        paint: {
+          'line-color': [
+            'match', ['get', 'worst_severity'],
+            'critical', severityMapColor('critical'),
+            'high', severityMapColor('high'),
+            'medium', severityMapColor('medium'),
+            'low', severityMapColor('low'),
+            severityMapColor('low'),
+          ],
+          'line-width': 7,
+          'line-opacity': 1,
+        },
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+      })
+
       // Event markers (always visible)
       map.addSource('events', {
         type: 'geojson',
@@ -99,6 +120,28 @@ export function MapContainer({ selectedTripId, onSelectTrip, selectedEventId, on
           ],
           'circle-opacity': 0.85,
           'circle-stroke-width': 2,
+          'circle-stroke-color': '#ffffff',
+        },
+      })
+
+      // Selected event highlight layer (larger, glowing)
+      map.addLayer({
+        id: 'event-points-selected',
+        type: 'circle',
+        source: 'events',
+        filter: ['==', ['get', 'event_id'], ''],
+        paint: {
+          'circle-radius': 14,
+          'circle-color': [
+            'match', ['get', 'severity_level'],
+            'critical', severityMapColor('critical'),
+            'high', severityMapColor('high'),
+            'medium', severityMapColor('medium'),
+            'low', severityMapColor('low'),
+            severityMapColor('low'),
+          ],
+          'circle-opacity': 0.4,
+          'circle-stroke-width': 3,
           'circle-stroke-color': '#ffffff',
         },
       })
@@ -181,6 +224,50 @@ export function MapContainer({ selectedTripId, onSelectTrip, selectedEventId, on
       }
     }
   }, [eventsGeoJSON, tripsGeoJSON])
+
+  // Update highlight filters when selection changes
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !map.isStyleLoaded()) return
+
+    // Highlight selected trip line
+    if (map.getLayer('trip-lines-selected')) {
+      map.setFilter('trip-lines-selected', ['==', ['get', 'trip_id'], selectedTripId || ''])
+    }
+    // Dim unselected trips when one is selected
+    if (map.getLayer('trip-lines')) {
+      map.setPaintProperty('trip-lines', 'line-opacity', selectedTripId ? 0.3 : 0.7)
+    }
+  }, [selectedTripId])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !map.isStyleLoaded()) return
+
+    // Highlight selected event marker
+    if (map.getLayer('event-points-selected')) {
+      map.setFilter('event-points-selected', ['==', ['get', 'event_id'], selectedEventId || ''])
+    }
+  }, [selectedEventId])
+
+  // Zoom to selected trip
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !selectedTripId || !tripsGeoJSON) return
+
+    const feature = tripsGeoJSON.features.find(
+      f => f.properties.trip_id === selectedTripId
+    )
+    if (!feature || feature.geometry.coordinates.length < 2) return
+
+    const bounds = new mapboxgl.LngLatBounds()
+    for (const coord of feature.geometry.coordinates) {
+      bounds.extend(coord as [number, number])
+    }
+    if (!bounds.isEmpty()) {
+      map.fitBounds(bounds, { padding: { top: 60, bottom: 60, left: 60, right: 420 }, maxZoom: 16 })
+    }
+  }, [selectedTripId, tripsGeoJSON])
 
   // Fly to selected event
   useEffect(() => {

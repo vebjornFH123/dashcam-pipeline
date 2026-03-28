@@ -7,9 +7,10 @@ import { Button } from '@/components/ui/button'
 interface AnalysisToastProps {
   jobId: string
   onDone: () => void
+  onTripReady?: (tripId: string) => void
 }
 
-export function AnalysisToast({ jobId, onDone }: AnalysisToastProps) {
+export function AnalysisToast({ jobId, onDone, onTripReady }: AnalysisToastProps) {
   const { job, error } = useJobStatus(jobId)
   const queryClient = useQueryClient()
 
@@ -17,8 +18,13 @@ export function AnalysisToast({ jobId, onDone }: AnalysisToastProps) {
     if (job?.status === 'complete') {
       queryClient.invalidateQueries({ queryKey: ['trips-geojson'] })
       queryClient.invalidateQueries({ queryKey: ['trips'] })
+      queryClient.invalidateQueries({ queryKey: ['events-geojson'] })
+      queryClient.invalidateQueries({ queryKey: ['events'] })
+      // job.id is the trip_id
+      onTripReady?.(jobId)
     }
-  }, [job?.status, queryClient])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [job?.status])
 
   const isComplete = job?.status === 'complete'
   const isError = job?.status === 'error' || !!error

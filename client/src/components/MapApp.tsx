@@ -4,6 +4,7 @@ import { TopBar } from '@/components/TopBar'
 import { RecordingOverlay } from '@/components/RecordingOverlay'
 import { AnalysisToast } from '@/components/AnalysisToast'
 import { EventSidebar } from '@/components/EventSidebar'
+import { TripPanel } from '@/components/TripPanel'
 
 export function MapApp() {
   const [isRecording, setIsRecording] = useState(false)
@@ -25,11 +26,20 @@ export function MapApp() {
         isAnalyzing={!!activeJobId}
       />
 
+      {/* Sidebar: show TripPanel when trip selected, otherwise EventSidebar */}
       {!isRecording && (
-        <EventSidebar
-          selectedEventId={selectedEventId}
-          onSelectEvent={setSelectedEventId}
-        />
+        selectedTripId ? (
+          <TripPanel
+            tripId={selectedTripId}
+            onClose={() => setSelectedTripId(null)}
+            onSelectEvent={setSelectedEventId}
+          />
+        ) : (
+          <EventSidebar
+            selectedEventId={selectedEventId}
+            onSelectEvent={setSelectedEventId}
+          />
+        )
       )}
 
       {isRecording && (
@@ -43,6 +53,7 @@ export function MapApp() {
         <AnalysisToast
           jobId={activeJobId}
           onDone={() => setActiveJobId(null)}
+          onTripReady={(tripId) => setSelectedTripId(tripId)}
         />
       )}
     </div>
