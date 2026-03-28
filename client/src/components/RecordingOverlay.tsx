@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Circle, Square, SwitchCamera, X, Navigation, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useCamera } from '@/hooks/useCamera'
@@ -21,9 +21,12 @@ export function RecordingOverlay({ onClose, onJobStarted }: RecordingOverlayProp
   const [uploadError, setUploadError] = useState<string | null>(null)
 
   // Open camera on mount
+  const mountedRef = useRef(false)
   useEffect(() => {
-    startCamera()
-    return () => stopCamera()
+    if (!mountedRef.current) {
+      mountedRef.current = true
+      startCamera()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
