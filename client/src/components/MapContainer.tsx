@@ -48,10 +48,25 @@ export function MapContainer({ selectedTripId, onSelectTrip, selectedEventId, on
       container: containerRef.current,
       style: 'mapbox://styles/mapbox/streets-v12',
       center: [10.75, 59.91],
-      zoom: 10,
+      zoom: 5,
     })
 
     map.addControl(new mapboxgl.NavigationControl(), 'top-right')
+    map.addControl(new mapboxgl.GeolocateControl({
+      positionOptions: { enableHighAccuracy: true },
+      trackUserLocation: false,
+    }), 'top-right')
+
+    // Center on user location if no data
+    navigator.geolocation?.getCurrentPosition(
+      (pos) => {
+        if (!tripsGeoJSON?.features.length && !eventsGeoJSON?.features.length) {
+          map.flyTo({ center: [pos.coords.longitude, pos.coords.latitude], zoom: 12 })
+        }
+      },
+      () => {},
+      { timeout: 5000 }
+    )
 
     map.on('load', () => {
       // Trip lines

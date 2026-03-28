@@ -17,10 +17,10 @@ export function severityColor(level: string) {
 
 export function severityMapColor(level: string) {
   switch (level) {
-    case 'critical': return '#ef4444'
-    case 'high': return '#f97316'
-    case 'medium': return '#eab308'
-    case 'low': return '#22c55e'
+    case 'critical': return '#dc2626'
+    case 'high': return '#ea580c'
+    case 'medium': return '#ca8a04'
+    case 'low': return '#16a34a'
     default: return '#6b7280'
   }
 }

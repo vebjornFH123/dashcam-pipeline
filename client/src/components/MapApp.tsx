@@ -38,6 +38,8 @@ export function MapApp() {
           <EventSidebar
             selectedEventId={selectedEventId}
             onSelectEvent={setSelectedEventId}
+            onSelectTrip={setSelectedTripId}
+            onRecord={() => setIsRecording(true)}
           />
         )
       )}

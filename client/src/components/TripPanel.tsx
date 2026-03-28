@@ -36,7 +36,7 @@ export function TripPanel({ tripId, onClose, onSelectEvent }: TripPanelProps) {
   return (
     <>
       {/* Desktop: side panel */}
-      <div className="hidden sm:flex absolute top-0 right-0 h-full w-96 z-20 flex-col bg-background/95 backdrop-blur-sm border-l shadow-xl">
+      <div className="hidden sm:flex absolute top-0 right-0 h-full w-96 z-20 flex-col bg-background/95 backdrop-blur-sm border-l shadow-xl animate-in slide-in-from-right duration-200">
         <PanelContent
           trip={trip}
           events={events}
@@ -48,7 +48,7 @@ export function TripPanel({ tripId, onClose, onSelectEvent }: TripPanelProps) {
       </div>
 
       {/* Mobile: bottom sheet */}
-      <div className="sm:hidden absolute bottom-0 left-0 right-0 z-20 max-h-[75svh] flex flex-col bg-background/95 backdrop-blur-sm border-t rounded-t-xl shadow-xl pb-[env(safe-area-inset-bottom)]">
+      <div className="sm:hidden absolute bottom-0 left-0 right-0 z-20 max-h-[75svh] flex flex-col bg-background/95 backdrop-blur-sm border-t rounded-t-xl shadow-xl pb-[env(safe-area-inset-bottom)] animate-in slide-in-from-bottom duration-200">
         <PanelContent
           trip={trip}
           events={events}
