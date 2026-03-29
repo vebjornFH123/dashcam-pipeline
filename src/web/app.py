@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 import os
+import shutil
 from pathlib import Path
 from typing import Optional
 
@@ -258,6 +259,63 @@ def api_get_trip(trip_id: str):
             })
 
     return {"trip": trip, "events": events}
+
+
+@app.delete("/api/trips/{trip_id}")
+def delete_trip(trip_id: str):
+    """Delete a trip and all its events."""
+    from src.web.jobs import _rebuild_exports
+
+    trip_dir = os.path.join(get_output_dir(), "trips", trip_id)
+    trip_meta_path = os.path.join(trip_dir, "trip_metadata.json")
+
+    if not os.path.exists(trip_meta_path):
+        return JSONResponse(status_code=404, content={"error": "Trip not found"})
+
+    # Load trip to get event IDs
+    with open(trip_meta_path) as f:
+        trip = json.load(f)
+
+    # Delete all events belonging to this trip
+    for event_id in trip.get("event_ids", []):
+        event_dir = os.path.join(get_output_dir(), "events", event_id)
+        if os.path.isdir(event_dir):
+            shutil.rmtree(event_dir)
+
+    # Delete trip directory
+    shutil.rmtree(trip_dir)
+
+    _rebuild_exports(get_output_dir())
+    return {"success": True}
+
+
+@app.delete("/api/events/{event_id}")
+def delete_event(event_id: str):
+    """Delete a single event."""
+    from src.web.jobs import _rebuild_exports
+
+    event_dir = os.path.join(get_output_dir(), "events", event_id)
+    if not os.path.isdir(event_dir):
+        return JSONResponse(status_code=404, content={"error": "Event not found"})
+
+    shutil.rmtree(event_dir)
+
+    # Also remove event_id from any trip that references it
+    trips_dir = os.path.join(get_output_dir(), "trips")
+    if os.path.isdir(trips_dir):
+        for tid in os.listdir(trips_dir):
+            meta_path = os.path.join(trips_dir, tid, "trip_metadata.json")
+            if os.path.isfile(meta_path):
+                with open(meta_path) as f:
+                    trip = json.load(f)
+                if event_id in trip.get("event_ids", []):
+                    trip["event_ids"].remove(event_id)
+                    trip["total_events"] = len(trip["event_ids"])
+                    with open(meta_path, "w") as f:
+                        json.dump(trip, f, indent=2)
+
+    _rebuild_exports(get_output_dir())
+    return {"success": True}
 
 
 @app.get("/api/geojson")

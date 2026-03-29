@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  Camera, MapPin, ChevronDown, ChevronUp, Video, Route,
+  Camera, MapPin, ChevronDown, ChevronUp, Video, Route, Trash2,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { SeverityBadge } from '@/components/SeverityBadge'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { api } from '@/api/client'
 import { InlineFrameViewer } from '@/components/InlineFrameViewer'
 import { formatTimestamp } from '@/lib/utils'
@@ -74,7 +75,26 @@ function SidebarContent({ trips, events, isLoading, selectedEventId, onSelectEve
   onSelectTrip?: (tripId: string) => void
   onRecord?: () => void
 }) {
+  const queryClient = useQueryClient()
   const [collapsedTrips, setCollapsedTrips] = useState<Set<string>>(new Set())
+
+  const invalidateAll = () => {
+    queryClient.invalidateQueries({ queryKey: ['trips'] })
+    queryClient.invalidateQueries({ queryKey: ['trips-geojson'] })
+    queryClient.invalidateQueries({ queryKey: ['events'] })
+    queryClient.invalidateQueries({ queryKey: ['events-geojson'] })
+  }
+
+  const handleDeleteTrip = async (tripId: string) => {
+    await api.deleteTrip(tripId)
+    invalidateAll()
+  }
+
+  const handleDeleteEvent = async (eventId: string) => {
+    await api.deleteEvent(eventId)
+    onSelectEvent(null)
+    invalidateAll()
+  }
 
   const toggleTrip = (tripId: string) => {
     setCollapsedTrips(prev => {
@@ -172,12 +192,24 @@ function SidebarContent({ trips, events, isLoading, selectedEventId, onSelectEve
                     <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
                       <span>{tripEvents.length} hendelser</span>
                       <span>{trip.gps_track.length} GPS-punkter</span>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); onSelectTrip?.(trip.trip_id) }}
-                        className="ml-auto text-primary hover:underline"
-                      >
-                        Vis tur →
-                      </button>
+                      <div className="ml-auto flex items-center gap-2">
+                        <ConfirmDialog
+                          trigger={
+                            <button className="text-destructive/60 hover:text-destructive p-0.5">
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          }
+                          title="Slett kjøretur?"
+                          description={`Dette sletter turen og alle ${tripEvents.length} tilhørende hendelser permanent.`}
+                          onConfirm={() => handleDeleteTrip(trip.trip_id)}
+                        />
+                        <button
+                          onClick={(e) => { e.stopPropagation(); onSelectTrip?.(trip.trip_id) }}
+                          className="text-primary hover:underline"
+                        >
+                          Vis tur →
+                        </button>
+                      </div>
                     </div>
                   </button>
 
@@ -190,6 +222,7 @@ function SidebarContent({ trips, events, isLoading, selectedEventId, onSelectEve
                           event={event}
                           isSelected={selectedEventId === event.event_id}
                           onSelect={() => onSelectEvent(selectedEventId === event.event_id ? null : event.event_id)}
+                          onDelete={handleDeleteEvent}
                           indent
                         />
                       ))}
@@ -220,6 +253,7 @@ function SidebarContent({ trips, events, isLoading, selectedEventId, onSelectEve
                   event={event}
                   isSelected={selectedEventId === event.event_id}
                   onSelect={() => onSelectEvent(selectedEventId === event.event_id ? null : event.event_id)}
+                  onDelete={handleDeleteEvent}
                 />
               ))}
             </div>
@@ -230,10 +264,11 @@ function SidebarContent({ trips, events, isLoading, selectedEventId, onSelectEve
   )
 }
 
-function EventListItem({ event, isSelected, onSelect, indent }: {
+function EventListItem({ event, isSelected, onSelect, onDelete, indent }: {
   event: EventSummary
   isSelected: boolean
   onSelect: () => void
+  onDelete?: (eventId: string) => Promise<void>
   indent?: boolean
 }) {
   const objectList = Object.entries(event.object_counts)
@@ -251,11 +286,25 @@ function EventListItem({ event, isSelected, onSelect, indent }: {
             <span className="text-xs font-medium">{event.event_id}</span>
             <SeverityBadge level={event.severity_level} />
           </div>
-          {isSelected ? (
-            <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" />
-          ) : (
-            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-          )}
+          <div className="flex items-center gap-1">
+            {onDelete && (
+              <ConfirmDialog
+                trigger={
+                  <button className="text-destructive/60 hover:text-destructive p-0.5">
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                }
+                title="Slett hendelse?"
+                description={`Hendelse ${event.event_id} og alle tilhørende frames vil bli slettet permanent.`}
+                onConfirm={() => onDelete(event.event_id)}
+              />
+            )}
+            {isSelected ? (
+              <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" />
+            ) : (
+              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
           <span className="flex items-center gap-1">

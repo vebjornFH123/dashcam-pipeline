@@ -72,6 +72,18 @@ export const api = {
     return fetchJSON<TripsGeoJSONCollection>('/trips/geojson')
   },
 
+  async deleteTrip(tripId: string) {
+    const res = await fetch(`${BASE_URL}/trips/${tripId}`, { method: 'DELETE' })
+    if (!res.ok) throw new Error(`Sletting feilet: ${res.status}`)
+    return res.json() as Promise<{ success: boolean }>
+  },
+
+  async deleteEvent(eventId: string) {
+    const res = await fetch(`${BASE_URL}/events/${eventId}`, { method: 'DELETE' })
+    if (!res.ok) throw new Error(`Sletting feilet: ${res.status}`)
+    return res.json() as Promise<{ success: boolean }>
+  },
+
   getJobs() {
     return fetchJSON<JobsResponse>('/jobs')
   },

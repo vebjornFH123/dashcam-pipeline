@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  X, Camera, MapPin, ChevronDown, ChevronUp,
+  X, Camera, MapPin, ChevronDown, ChevronUp, Trash2,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { InlineFrameViewer } from '@/components/InlineFrameViewer'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { SeverityBadge } from '@/components/SeverityBadge'
 import { api } from '@/api/client'
 import { formatTimestamp } from '@/lib/utils'
@@ -19,10 +20,24 @@ interface TripPanelProps {
 
 export function TripPanel({ tripId, onClose, onSelectEvent }: TripPanelProps) {
   const [expandedEventId, setExpandedEventId] = useState<string | null>(null)
+  const queryClient = useQueryClient()
 
   const handleExpandEvent = (eventId: string | null) => {
     setExpandedEventId(eventId)
     onSelectEvent?.(eventId)
+  }
+
+  const invalidateAll = () => {
+    queryClient.invalidateQueries({ queryKey: ['trips'] })
+    queryClient.invalidateQueries({ queryKey: ['trips-geojson'] })
+    queryClient.invalidateQueries({ queryKey: ['events'] })
+    queryClient.invalidateQueries({ queryKey: ['events-geojson'] })
+  }
+
+  const handleDeleteTrip = async () => {
+    await api.deleteTrip(tripId)
+    invalidateAll()
+    onClose()
   }
 
   const { data, isLoading } = useQuery({
@@ -44,6 +59,7 @@ export function TripPanel({ tripId, onClose, onSelectEvent }: TripPanelProps) {
           expandedEventId={expandedEventId}
           onExpandEvent={handleExpandEvent}
           onClose={onClose}
+          onDeleteTrip={handleDeleteTrip}
         />
       </div>
 
@@ -56,19 +72,21 @@ export function TripPanel({ tripId, onClose, onSelectEvent }: TripPanelProps) {
           expandedEventId={expandedEventId}
           onExpandEvent={handleExpandEvent}
           onClose={onClose}
+          onDeleteTrip={handleDeleteTrip}
         />
       </div>
     </>
   )
 }
 
-function PanelContent({ trip, events, isLoading, expandedEventId, onExpandEvent, onClose }: {
+function PanelContent({ trip, events, isLoading, expandedEventId, onExpandEvent, onClose, onDeleteTrip }: {
   trip: { trip_id: string; filename: string; created_at: string; completed_at: string | null; total_events: number; worst_severity: string; gps_track: number[][] } | undefined
   events: EventDetail[]
   isLoading: boolean
   expandedEventId: string | null
   onExpandEvent: (id: string | null) => void
   onClose: () => void
+  onDeleteTrip: () => Promise<void>
 }) {
   if (isLoading) {
     return (
@@ -90,6 +108,16 @@ function PanelContent({ trip, events, isLoading, expandedEventId, onExpandEvent,
         </div>
         <div className="flex items-center gap-2">
           {trip && <SeverityBadge level={trip.worst_severity} />}
+          <ConfirmDialog
+            trigger={
+              <Button variant="ghost" size="icon-sm" className="text-destructive/60 hover:text-destructive">
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            }
+            title="Slett kjøretur?"
+            description={`Dette sletter turen og alle ${events.length} tilhørende hendelser permanent.`}
+            onConfirm={onDeleteTrip}
+          />
           <Button variant="ghost" size="icon-sm" onClick={onClose}>
             <X className="h-4 w-4" />
           </Button>
