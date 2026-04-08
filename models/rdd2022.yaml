@@ -1,11 +1,14 @@
 
-# Road Damage Detection dataset
-path: /Users/vebjornfh/Documents/Mine-Oppgaver/dashcam-pipeline_v4/models/rdd_data
-train: images/train
-val: images/val
+# Road Damage Detection dataset (RDD2022)
+# Dataset: https://figshare.com/articles/dataset/21431547
+# Prepare with: python scripts/train_road_damage.py --prepare --rdd-zip /path/to/RDD2022.zip
+path: ./datasets
+train: rdd2022_images/train
+val: rdd2022_images/val
 
+nc: 4
 names:
-  0: longitudinal_crack
-  1: transverse_crack  
-  2: alligator_crack
-  3: pothole
+  0: longitudinal_crack   # D00 - lengdesprekker
+  1: transverse_crack      # D10 - tverrsprekker
+  2: alligator_crack       # D20 - nettsprekker
+  3: pothole               # D40 - hull i veidekke

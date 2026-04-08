@@ -14,9 +14,11 @@ client/dist/
 output/
 runs/
 
-# Models - training data only
-models/road_damage_data/
+# Models
 !models/.gitkeep
+
+# Training datasets
+datasets/
 
 # Environment
 .env

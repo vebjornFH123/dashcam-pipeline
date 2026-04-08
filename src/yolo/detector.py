@@ -2,10 +2,8 @@
 
 Supports dual-model detection:
   1. Standard model (e.g. YOLOv8n) for traffic objects (COCO classes)
-  2. Road damage model for infrastructure defects (potholes, cracks, guardrails)
-
-The road damage model can be any YOLO-compatible .pt trained on road damage data
-(e.g. RDD2022, custom trained). Pass --road-damage-model to the CLI to enable.
+  2. Road damage model (RDD2022) for 4 damage classes:
+     longitudinal_crack, transverse_crack, alligator_crack, pothole
 """
 
 import logging
@@ -31,29 +29,6 @@ ROAD_DAMAGE_CLASSES = {
     3: "pothole",               # D40 - hull i veidekke
 }
 
-# Extended infrastructure classes (custom model)
-INFRASTRUCTURE_CLASSES = {
-    "guardrail": "guardrail",               # rekkverk
-    "guardrail_damage": "guardrail_damage", # skadet rekkverk
-    "road_marking_worn": "road_marking_worn",
-    "road_surface_damage": "road_surface_damage",
-    "manhole_cover": "manhole_cover",       # kumlokk
-    "road_sign_damage": "road_sign_damage",
-    "barrier": "barrier",                   # betongrekkverk
-    "drainage_issue": "drainage_issue",     # dreneringsproblem
-    "edge_deterioration": "edge_deterioration",  # kantsladd
-    # Road debris & litter (gjenstander og søppel)
-    "road_debris": "road_debris",           # gjenstander i veibanen
-    "tire": "tire",                         # dekk/bildekk
-    "litter": "litter",                     # søppel
-    "fallen_tree": "fallen_tree",           # veltet tre
-    "rock": "rock",                         # stein
-    "construction_material": "construction_material",  # byggemateriale
-    "lost_cargo": "lost_cargo",             # tapt last
-    "plastic_bag": "plastic_bag",           # plastpose
-    "metal_object": "metal_object",         # metallobjekt
-}
-
 # Colors for annotation (BGR for OpenCV)
 ANNOTATION_COLORS = {
     # Traffic objects
@@ -65,54 +40,11 @@ ANNOTATION_COLORS = {
     "bus": (255, 165, 0),
     "traffic light": (0, 255, 255),
     "stop sign": (0, 255, 255),
-    # Road damage - red/magenta tones
+    # Road damage (RDD2022)
     "longitudinal_crack": (0, 0, 200),
     "transverse_crack": (50, 0, 200),
     "alligator_crack": (100, 0, 200),
     "pothole": (0, 0, 255),
-    # Infrastructure - purple/pink tones
-    "guardrail": (200, 100, 0),
-    "guardrail_damage": (200, 0, 200),
-    "road_surface_damage": (0, 50, 255),
-    "road_marking_worn": (0, 200, 200),
-    "barrier": (200, 100, 50),
-    "edge_deterioration": (100, 0, 150),
-    # Road debris - yellow/orange tones
-    "road_debris": (0, 200, 255),
-    "tire": (0, 180, 220),
-    "litter": (50, 220, 255),
-    "fallen_tree": (0, 150, 100),
-    "rock": (100, 100, 200),
-    "construction_material": (0, 140, 255),
-    "lost_cargo": (0, 100, 255),
-    "plastic_bag": (150, 255, 100),
-    "metal_object": (180, 180, 200),
-}
-
-# Category tags for detections
-DAMAGE_CATEGORIES = {
-    "longitudinal_crack": "road_damage",
-    "transverse_crack": "road_damage",
-    "alligator_crack": "road_damage",
-    "pothole": "road_damage",
-    "guardrail": "infrastructure",
-    "guardrail_damage": "infrastructure_damage",
-    "road_marking_worn": "road_damage",
-    "road_surface_damage": "road_damage",
-    "manhole_cover": "infrastructure",
-    "road_sign_damage": "infrastructure_damage",
-    "barrier": "infrastructure",
-    "drainage_issue": "infrastructure",
-    "edge_deterioration": "road_damage",
-    "road_debris": "road_hazard",
-    "tire": "road_hazard",
-    "litter": "road_hazard",
-    "fallen_tree": "road_hazard",
-    "rock": "road_hazard",
-    "construction_material": "road_hazard",
-    "lost_cargo": "road_hazard",
-    "plastic_bag": "road_hazard",
-    "metal_object": "road_hazard",
 }
 
 
@@ -276,7 +208,7 @@ class YOLODetector:
             if rdm is not None:
                 raw, rd_height = self._run_model(rdm, frame_path, self.road_damage_confidence)
                 for d in raw:
-                    d["category"] = DAMAGE_CATEGORIES.get(d["class_name"], "road_damage")
+                    d["category"] = "road_damage"
 
                 # Road mask filter: only keep damage on actual road surface
                 road_mask = self._build_road_mask(frame_path)
@@ -369,7 +301,7 @@ class YOLODetector:
             label = f"{cls_name} {obj['confidence']:.2f}"
 
             color = ANNOTATION_COLORS.get(cls_name, (0, 255, 0))
-            thickness = 3 if category in ("road_damage", "infrastructure_damage", "road_hazard") else 2
+            thickness = 3 if category == "road_damage" else 2
 
             cv2.rectangle(img, (x1, y1), (x2, y2), color, thickness)
 

@@ -1,92 +1,52 @@
-# Road Damage & Infrastructure Detection Guide
+# Road Damage Detection Guide
 
 ## Overview
 
 The dashcam pipeline supports **dual-model YOLO detection**:
 
-1. **Primary model** (standard YOLOv8): Traffic objects — cars, trucks, pedestrians, bicycles, signs, etc.
-2. **Road damage model** (optional): Infrastructure defects — potholes, cracks, guardrail damage, etc.
+1. **Primary model** (YOLOv8): Traffic objects — cars, trucks, pedestrians, bicycles, signs, etc.
+2. **Road damage model** (RDD2022-trained): 4 road damage classes
 
 ## Supported Damage Classes
 
-### Road Surface Damage
-| Class | Norwegian | Description |
-|-------|-----------|-------------|
-| `longitudinal_crack` | Lengdesprekk | Cracks along the road direction (D00) |
-| `transverse_crack` | Tverrsprekk | Cracks across the road (D10) |
-| `alligator_crack` | Nettsprekk | Network/fatigue cracking pattern (D20) |
-| `pothole` | Hull i veidekke | Holes in the road surface (D40) |
-| `road_surface_damage` | Veidekke-skade | General surface deterioration |
-| `road_marking_worn` | Slitt vegoppmerking | Worn road markings |
-| `edge_deterioration` | Kantsladd | Road edge deterioration |
-
-### Infrastructure
-| Class | Norwegian | Description |
-|-------|-----------|-------------|
-| `guardrail` | Rekkverk | Guardrail present (no damage) |
-| `guardrail_damage` | Skadet rekkverk | Damaged guardrail |
-| `barrier` | Betongrekkverk | Concrete barrier |
-| `road_sign_damage` | Skadet skilt | Damaged road sign |
-| `manhole_cover` | Kumlokk | Manhole cover |
-| `drainage_issue` | Dreneringsproblem | Drainage issues |
-
-### Road Debris & Litter (Gjenstander og søppel)
-| Class | Norwegian | Description |
-|-------|-----------|-------------|
-| `road_debris` | Gjenstand i veibanen | General road debris/obstacle |
-| `tire` | Bildekk | Loose tire on road |
-| `fallen_tree` | Veltet tre | Fallen tree blocking road |
-| `rock` | Stein | Rock on road surface |
-| `construction_material` | Byggemateriale | Construction materials left on road |
-| `lost_cargo` | Tapt last | Lost cargo from vehicles |
-| `metal_object` | Metallobjekt | Metal debris on road |
-| `litter` | Søppel | General litter/trash |
-| `plastic_bag` | Plastpose | Plastic bags on road |
+| Class | RDD2022 Code | Norwegian | Description |
+|-------|-------------|-----------|-------------|
+| `longitudinal_crack` | D00 | Lengdesprekk | Cracks along the road direction |
+| `transverse_crack` | D10 | Tverrsprekk | Cracks across the road |
+| `alligator_crack` | D20 | Nettsprekk | Network/fatigue cracking pattern |
+| `pothole` | D40 | Hull i veidekke | Holes in the road surface |
 
 ## Usage
 
-### With a pre-trained road damage model
+### Run the pipeline
 
 ```bash
 python -m src.main \
   --input ./videos \
   --output ./output \
-  --road-damage-model ./models/road_damage_yolov8.pt \
-  --road-damage-confidence 0.20
+  --strategy full_scan
 ```
 
-### Training your own model
+The model is auto-detected from `models/road_damage.pt`.
 
-1. **Dataset**: Use [RDD2022](https://github.com/sekilab/RoadDamageDetector) or the
-   [Kaggle Road Damage Dataset](https://www.kaggle.com/datasets) with Norwegian road imagery.
+### Training
 
-2. **Training with Ultralytics**:
+See `scripts/train_road_damage.py` for training on the RDD2022 dataset:
+
 ```bash
-yolo train model=yolov8n.pt data=road_damage.yaml epochs=100 imgsz=640
+# Prepare dataset (one-time)
+python scripts/train_road_damage.py \
+  --prepare \
+  --rdd-zip ~/datasets/RDD2022.zip \
+  --countries Norway Japan Czech United_States
+
+# Train
+python scripts/train_road_damage.py \
+  --model yolov8s.pt \
+  --epochs 150 \
+  --batch 16 \
+  --device mps
 ```
-
-3. **Custom data.yaml example**:
-```yaml
-train: ./train/images
-val: ./val/images
-nc: 7
-names:
-  0: longitudinal_crack
-  1: transverse_crack
-  2: alligator_crack
-  3: pothole
-  4: guardrail
-  5: guardrail_damage
-  6: road_surface_damage
-```
-
-### Recommended models
-
-| Model | Source | Classes |
-|-------|--------|---------|
-| RDD2022 YOLOv8 | [GitHub](https://github.com/sekilab/RoadDamageDetector) | D00, D10, D20, D40 |
-| Custom Norwegian | Train on Statens vegvesen data | Full class set |
-| CRDDC2022 winners | Challenge results | Road damage |
 
 ## Output Format
 
@@ -112,23 +72,16 @@ When road damage is detected, each frame's detection result includes:
 }
 ```
 
-Event metadata includes `damage_counts`:
-```json
-{
-  "object_counts": {"car": 5, "person": 2},
-  "damage_counts": {"pothole": 3, "longitudinal_crack": 1}
-}
-```
-
 ## Severity Scoring
 
 Road damage contributes up to 20 points to the severity score (out of 100):
-- **Potholes**: weight 9 (highest)
-- **Guardrail damage**: weight 8
-- **Alligator cracks**: weight 7
-- **Surface damage**: weight 7
-- **Transverse cracks**: weight 5
-- **Edge deterioration**: weight 5
+
+| Class | Weight | Risk |
+|-------|--------|------|
+| Pothole | 9 | Highest |
+| Alligator crack | 7 | High |
+| Transverse crack | 5 | Medium |
+| Longitudinal crack | 4 | Medium |
 
 Multiple damage types in the same event trigger a compound multiplier.
 

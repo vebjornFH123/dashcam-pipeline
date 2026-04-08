@@ -1,6 +1,6 @@
 """Event severity scoring engine.
 
-Includes road damage and infrastructure scoring alongside traffic object risk.
+Scores events based on traffic objects and RDD2022 road damage detections.
 """
 
 import logging
@@ -26,31 +26,12 @@ OBJECT_RISK_WEIGHTS = {
     "stop sign": 2,
 }
 
-# Weights for road damage types (infrastructure condition)
+# Weights for road damage types (RDD2022 classes)
 DAMAGE_RISK_WEIGHTS = {
-    "pothole": 9,
-    "alligator_crack": 7,
-    "transverse_crack": 5,
-    "longitudinal_crack": 4,
-    "guardrail_damage": 8,
-    "road_surface_damage": 7,
-    "road_marking_worn": 3,
-    "road_sign_damage": 6,
-    "edge_deterioration": 5,
-    "drainage_issue": 4,
-    "guardrail": 1,         # present but not damaged = low risk
-    "barrier": 1,
-    "manhole_cover": 1,
-    # Road debris / hazards
-    "road_debris": 8,
-    "tire": 7,
-    "fallen_tree": 9,
-    "rock": 7,
-    "construction_material": 6,
-    "lost_cargo": 8,
-    "metal_object": 7,
-    "litter": 2,
-    "plastic_bag": 1,
+    "pothole": 9,               # D40 - hull i veidekke
+    "alligator_crack": 7,       # D20 - nettsprekker
+    "transverse_crack": 5,      # D10 - tverrsprekker
+    "longitudinal_crack": 4,    # D00 - lengdesprekker
 }
 
 

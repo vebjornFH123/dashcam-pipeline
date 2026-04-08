@@ -1,9 +1,0 @@
-
-path: /Users/vebjornfh/Documents/Mine-Oppgaver/dashcam-pipeline_v4/models/road_damage_data
-train: images/train
-val: images/val
-
-names:
-  0: pothole
-  1: crack
-  2: road_wear
