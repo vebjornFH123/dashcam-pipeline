@@ -48,8 +48,7 @@ def analyze_video(
     strategy: str = "full_scan",
     fps: float = 1.0,
     threshold: float = 0.3,
-    yolo_model: str = "yolov8n.pt",
-    road_damage_model: Optional[str] = None,
+    yolo_model: str = "models/road_damage.pt",
     road_damage_confidence: float = 0.30,
     trackpoints: Optional[list] = None,
     use_ocr: bool = False,
@@ -64,8 +63,7 @@ def analyze_video(
         strategy: "full_scan" or "event_detection".
         fps: Frames per second to extract.
         threshold: Detection sensitivity (0.0-1.0).
-        yolo_model: Primary YOLO model path.
-        road_damage_model: Optional road damage model path.
+        yolo_model: Road damage YOLO model path.
         road_damage_confidence: Confidence threshold for road damage.
         trackpoints: Optional GPS trackpoints.
         use_ocr: Enable OCR metadata extraction.
@@ -88,13 +86,13 @@ def analyze_video(
     if strategy == "full_scan":
         return _analyze_full_scan(
             video_path, output_dir, fps, yolo_model,
-            road_damage_model, road_damage_confidence,
+            road_damage_confidence,
             trackpoints, use_ocr, event_counter_start, progress,
         )
     elif strategy == "event_detection":
         return _analyze_event_detection(
             video_path, output_dir, fps, threshold, yolo_model,
-            road_damage_model, road_damage_confidence,
+            road_damage_confidence,
             trackpoints, use_ocr, event_counter_start, progress,
         )
     else:
@@ -103,7 +101,7 @@ def analyze_video(
 
 def _analyze_full_scan(
     video_path, output_dir, fps, yolo_model,
-    road_damage_model, road_damage_confidence,
+    road_damage_confidence,
     trackpoints, use_ocr, event_counter_start, progress,
 ):
     """Strategy: Analyze entire video frame by frame, group detections into events."""
@@ -126,15 +124,11 @@ def _analyze_full_scan(
     progress(f"Steg 1/5 — {len(all_frames)} frames ekstrahert")
 
     # Step 2: YOLO on all frames
-    model_info = yolo_model
-    if road_damage_model:
-        model_info += f" + {os.path.basename(road_damage_model)}"
-    progress(f"Steg 2/5 — YOLO-deteksjon på {len(all_frames)} frames ({model_info})...")
+    progress(f"Steg 2/5 — Veiskade-deteksjon på {len(all_frames)} frames ({os.path.basename(yolo_model)})...")
 
     detector = YOLODetector(
         model_path=yolo_model,
-        road_damage_model_path=road_damage_model,
-        road_damage_confidence=road_damage_confidence,
+        confidence=road_damage_confidence,
     )
     all_detections = detector.detect_frames(all_frames)
 
@@ -235,7 +229,7 @@ def _analyze_full_scan(
 
 def _analyze_event_detection(
     video_path, output_dir, fps, threshold, yolo_model,
-    road_damage_model, road_damage_confidence,
+    road_damage_confidence,
     trackpoints, use_ocr, event_counter_start, progress,
 ):
     """Strategy: Detect events via scene/motion changes, then analyze clips."""
@@ -276,8 +270,7 @@ def _analyze_event_detection(
     progress("Steg 4/7 — Laster YOLO-modell...")
     detector = YOLODetector(
         model_path=yolo_model,
-        road_damage_model_path=road_damage_model,
-        road_damage_confidence=road_damage_confidence,
+        confidence=road_damage_confidence,
     )
 
     # Steps 5-7: Process each event

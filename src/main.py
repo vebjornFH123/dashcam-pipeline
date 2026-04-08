@@ -19,12 +19,12 @@ def process_video(
     output_dir: str,
     threshold: float = 0.3,
     fps: float = 1.0,
-    yolo_model: str = "yolov8n.pt",
+    yolo_model: str = "models/road_damage.pt",
     trackpoints: list = None,
     use_ocr: bool = False,
-    road_damage_model: str = None,
-    road_damage_confidence: float = 0.20,
+    road_damage_confidence: float = 0.30,
     event_counter_start: int = 0,
+    **kwargs,
 ) -> list:
     """Process a single video. Delegates to shared pipeline."""
     return analyze_video(
@@ -34,7 +34,6 @@ def process_video(
         fps=fps,
         threshold=threshold,
         yolo_model=yolo_model,
-        road_damage_model=road_damage_model,
         road_damage_confidence=road_damage_confidence,
         trackpoints=trackpoints,
         use_ocr=use_ocr,
@@ -44,7 +43,7 @@ def process_video(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Dashcam Analytics Pipeline",
+        description="Dashcam Analytics Pipeline — Road Damage Detection",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -62,12 +61,10 @@ Examples:
     parser.add_argument("--gpx", help="Directory containing GPX/NMEA/CSV track files")
     parser.add_argument("--fps", type=float, default=1.0, help="Frames per second to extract")
     parser.add_argument("--threshold", type=float, default=0.3, help="Event detection sensitivity (0.0-1.0)")
-    parser.add_argument("--yolo-model", default="yolov8n.pt", help="YOLO model path or name")
+    parser.add_argument("--yolo-model", default="models/road_damage.pt", help="Road damage YOLO model path")
     parser.add_argument("--ocr", action="store_true", help="Enable OCR for overlay text extraction")
-    parser.add_argument("--road-damage-model", default=None,
-                        help="Path to road damage YOLO model. Enables dual-model detection.")
     parser.add_argument("--road-damage-confidence", type=float, default=0.30,
-                        help="Confidence threshold for road damage model (default: 0.30)")
+                        help="Confidence threshold for road damage detection (default: 0.30)")
     parser.add_argument("--run-web-ui", action="store_true", help="Start web UI after processing")
     parser.add_argument("--web-port", type=int, default=8000, help="Web UI port")
     parser.add_argument("--log-level", default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"])
@@ -108,7 +105,6 @@ Examples:
             fps=args.fps,
             threshold=args.threshold,
             yolo_model=args.yolo_model,
-            road_damage_model=args.road_damage_model,
             road_damage_confidence=args.road_damage_confidence,
             trackpoints=trackpoints if trackpoints else None,
             use_ocr=args.ocr,

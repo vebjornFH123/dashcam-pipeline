@@ -49,115 +49,33 @@ ANNOTATION_COLORS = {
 
 
 class YOLODetector:
-    """YOLO-based object detector for dashcam frames.
-    
-    Supports dual-model detection:
-      - Primary model: Standard YOLO for traffic objects
-      - Road damage model: Optional second model for road/infrastructure defects
+    """YOLO-based road damage detector for dashcam frames.
+
+    Uses a single RDD2022-trained model to detect 4 damage classes:
+    longitudinal_crack, transverse_crack, alligator_crack, pothole.
     """
 
     def __init__(
         self,
-        model_path: str = "yolov8n.pt",
+        model_path: str = "models/road_damage.pt",
         confidence: float = 0.25,
-        road_damage_model_path: Optional[str] = None,
-        road_damage_confidence: float = 0.20,
+        **kwargs,
     ):
         self.model_path = model_path
         self.confidence = confidence
-        self.road_damage_model_path = road_damage_model_path
-        self.road_damage_confidence = road_damage_confidence
         self._model = None
-        self._road_damage_model = None
-        self._seg_model = None
 
     @property
     def model(self):
         if self._model is None:
             try:
                 from ultralytics import YOLO
-                logger.info(f"Loading primary YOLO model: {self.model_path}")
+                logger.info(f"Loading road damage model: {self.model_path}")
                 self._model = YOLO(self.model_path)
             except ImportError:
                 logger.error("ultralytics not installed. Install with: pip install ultralytics")
                 raise
         return self._model
-
-    @property
-    def road_damage_model(self):
-        if self._road_damage_model is None and self.road_damage_model_path:
-            try:
-                from ultralytics import YOLO
-                logger.info(f"Loading road damage model: {self.road_damage_model_path}")
-                self._road_damage_model = YOLO(self.road_damage_model_path)
-            except ImportError:
-                logger.error("ultralytics not installed")
-                raise
-            except Exception as e:
-                logger.error(f"Failed to load road damage model: {e}")
-                self.road_damage_model_path = None  # Disable for subsequent calls
-        return self._road_damage_model
-
-    @property
-    def seg_model(self):
-        """Segmentation model for road surface detection."""
-        if self._seg_model is None and self.road_damage_model_path:
-            try:
-                from ultralytics import YOLO
-                logger.info("Loading segmentation model for road masking: yolov8n-seg.pt")
-                self._seg_model = YOLO("yolov8n-seg.pt")
-            except Exception as e:
-                logger.warning(f"Could not load seg model, using Y-position filter: {e}")
-        return self._seg_model
-
-    def _build_road_mask(self, frame_path: str):
-        """Build a road surface mask using YOLO segmentation.
-
-        Returns a binary mask where road pixels = 255, or None if seg model unavailable.
-        """
-        import cv2
-        import numpy as np
-
-        seg = self.seg_model
-        if seg is None:
-            return None
-
-        img = cv2.imread(frame_path)
-        if img is None:
-            return None
-        h, w = img.shape[:2]
-
-        results = seg(frame_path, conf=0.25, verbose=False)
-
-        # Build object mask from all detected objects
-        object_mask = np.zeros((h, w), dtype=np.uint8)
-        for r in results:
-            if r.masks is not None:
-                for mask in r.masks.data:
-                    m = mask.cpu().numpy()
-                    m_resized = cv2.resize(m, (w, h))
-                    object_mask[m_resized > 0.5] = 255
-
-        # Road = lower 65% of frame minus objects (with padding)
-        road_mask = np.zeros((h, w), dtype=np.uint8)
-        road_mask[int(h * 0.35):, :] = 255
-
-        # Expand objects slightly to exclude car edges etc.
-        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (30, 30))
-        object_expanded = cv2.dilate(object_mask, kernel)
-        road_mask[object_expanded > 0] = 0
-
-        return road_mask
-
-    def _is_on_road(self, bbox: dict, road_mask) -> bool:
-        """Check if a detection bbox center falls on the road mask."""
-        import numpy as np
-        cx = int((bbox["x1"] + bbox["x2"]) / 2)
-        cy = int((bbox["y1"] + bbox["y2"]) / 2)
-        h, w = road_mask.shape
-        if 0 <= cy < h and 0 <= cx < w:
-            return road_mask[cy, cx] > 0
-        return False
 
     def _run_model(self, model, frame_path: str, confidence: float) -> tuple:
         """Run a YOLO model on a frame and return (detections, image_height)."""
@@ -189,56 +107,24 @@ class YOLODetector:
         return detections, img_height
 
     def detect_frame(self, frame_path: str) -> Dict[str, Any]:
-        """Run detection on a single frame (both models if available).
-        
+        """Run road damage detection on a single frame.
+
         Returns:
-            Dict with 'objects' list and optional 'road_damage' list.
+            Dict with 'objects' list and 'road_damage' list.
         """
-        # Primary model
-        traffic_detections, img_height = self._run_model(self.model, frame_path, self.confidence)
+        detections, img_height = self._run_model(self.model, frame_path, self.confidence)
 
-        # Tag traffic detections
-        for d in traffic_detections:
-            d["category"] = "traffic"
-
-        # Road damage model (if configured)
-        damage_detections = []
-        if self.road_damage_model_path:
-            rdm = self.road_damage_model
-            if rdm is not None:
-                raw, rd_height = self._run_model(rdm, frame_path, self.road_damage_confidence)
-                for d in raw:
-                    d["category"] = "road_damage"
-
-                # Road mask filter: only keep damage on actual road surface
-                road_mask = self._build_road_mask(frame_path)
-                if road_mask is not None:
-                    before = len(raw)
-                    raw = [d for d in raw if self._is_on_road(d["bbox"], road_mask)]
-                    if before != len(raw):
-                        logger.debug(f"Road mask: {before} → {len(raw)} damage detections")
-                else:
-                    # Fallback: simple Y-position filter (lower 60%)
-                    h = rd_height or img_height
-                    if h > 0:
-                        road_top = h * 0.40
-                        raw = [
-                            d for d in raw
-                            if (d["bbox"]["y1"] + d["bbox"]["y2"]) / 2 > road_top
-                        ]
-                damage_detections = raw
-
-        all_objects = traffic_detections + damage_detections
+        for d in detections:
+            d["category"] = "road_damage"
 
         result = {
             "frame": os.path.basename(frame_path),
-            "objects": all_objects,
+            "objects": detections,
         }
 
-        # Add damage summary if any damage detections found
-        if damage_detections:
-            result["road_damage"] = damage_detections
-            result["damage_summary"] = _summarize_damage(damage_detections)
+        if detections:
+            result["road_damage"] = detections
+            result["damage_summary"] = _summarize_damage(detections)
 
         return result
 

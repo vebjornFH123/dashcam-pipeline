@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 ALLOWED_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv", ".webm"}
 
 
-def _find_road_damage_model() -> Optional[str]:
+def _find_road_damage_model() -> str:
     """Find road damage model — env var, or auto-detect in models/ dir."""
     env_path = os.environ.get("DASHCAM_ROAD_DAMAGE_MODEL")
     if env_path and os.path.isfile(env_path):
@@ -28,7 +28,7 @@ def _find_road_damage_model() -> Optional[str]:
         if os.path.isfile(abspath):
             return abspath
 
-    return None
+    return "models/road_damage.pt"
 
 
 @dataclass
@@ -166,10 +166,7 @@ async def run_worker(output_dir: str):
     from src.pipeline import analyze_video
 
     rd_model = _find_road_damage_model()
-    if rd_model:
-        logger.info(f"Road damage model: {rd_model}")
-    else:
-        logger.info("No road damage model found (set DASHCAM_ROAD_DAMAGE_MODEL or place models/road_damage.pt)")
+    logger.info(f"Road damage model: {rd_model}")
 
     logger.info("Job worker started, waiting for jobs...")
 
@@ -205,8 +202,7 @@ async def run_worker(output_dir: str):
                     output_dir=output_dir,
                     strategy="full_scan",
                     fps=1.0,
-                    yolo_model="yolov8n.pt",
-                    road_damage_model=_find_road_damage_model(),
+                    yolo_model=rd_model,
                     road_damage_confidence=0.30,
                     trackpoints=trackpoints,
                     event_counter_start=event_counter,
